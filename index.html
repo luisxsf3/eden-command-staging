@@ -579,34 +579,8 @@ let pendingCloudSave = false, lastSyncOpAt = 0;
 // ===== GESTÃO DATA =====
 let gesCurrentMeses = ['Jan','Fev','Mar','Abr'];
 let gesLojasRaw = [];
-
-let gesLojas = [
-  {nome:'Farmácia Salvadora',  b:'BatePreço',  c:'Macaparana',    uf:'PE', fat:[154679,131373,155120,null],   cmv:[.6327,.6585,.6581,null],   tkt:[41.06,38.59,38.75,null],  cli:[3767,3404,4003,null]},
-  {nome:'Mesquita Med.',       b:'BatePreço',  c:'Campo Grande',  uf:'MS', fat:[199441,183084,230459,235884], cmv:[.574,.575,.584,.594],      tkt:[45.40,45.25,47.69,49.02], cli:[4393,4046,4832,4811]},
-  {nome:'V S Oliveira L1',     b:'BatePreço',  c:'Timon',         uf:'MA', fat:[79678,80618,103700,105353],   cmv:[.6035,.571,.6384,.6028],   tkt:[30.10,29.75,30.95,32.38], cli:[2646,2483,3351,3254]},
-  {nome:'V S Oliveira L2',     b:'BatePreço',  c:'Coroatá',       uf:'MA', fat:[null,null,66712,56843],       cmv:[null,null,.5375,.5758],    tkt:[null,null,30.43,29.68],   cli:[null,null,2192,1915]},
-  {nome:'V S Oliveira L3',     b:'BatePreço',  c:'Pedreiras',     uf:'MA', fat:[60213,62043,78879,85443],     cmv:[.6266,.583,.5908,.5725],   tkt:[30.81,36.59,40.31,43.53], cli:[1954,1399,1957,1963]},
-  {nome:'V S Oliveira L4',     b:'BatePreço',  c:'Caxias',        uf:'MA', fat:[419873,387639,436219,438103], cmv:[.6257,.622,.5828,.6329],   tkt:[49.54,47.94,49.04,50.07], cli:[8475,6739,8895,8750]},
-  {nome:'V S Oliveira L5',     b:'BatePreço',  c:'Codó',          uf:'MA', fat:[null,null,71197,63204],       cmv:[null,null,.6503,.5582],    tkt:[null,null,25.36,25.39],   cli:[null,null,2807,2492]},
-  {nome:'Lemos L6',            b:'BatePreço',  c:'Peritoró',      uf:'MA', fat:[null,null,88670,83409],       cmv:[null,null,.5759,.592],     tkt:[null,null,29.57,30.59],   cli:[null,null,2999,2727]},
-  {nome:'Lemos L7 Bacabal',    b:'BatePreço',  c:'Bacabal',       uf:'MA', fat:[null,null,46899,46605],       cmv:[null,null,.5098,.5215],    tkt:[null,null,28.12,30.13],   cli:[null,null,1668,1547]},
-  {nome:'Lemos L8',            b:'BatePreço',  c:'São Mateus',    uf:'MA', fat:[null,null,80838,72891],       cmv:[null,null,.6105,.596],     tkt:[null,null,27.40,27.33],   cli:[null,null,2950,2667]},
-  {nome:'Lemos L9',            b:'BatePreço',  c:'Alto Alegre',   uf:'MA', fat:[null,null,75346,86503],       cmv:[null,null,.5207,.5643],    tkt:[null,null,30.70,34.38],   cli:[null,null,2454,2516]},
-  {nome:'Farmácia Preço Baixo',b:'BatePreço',  c:'Ji-Paraná',     uf:'RO', fat:[136807,132044,137480,null],   cmv:[.6538,.4955,.7432,null],   tkt:[46.77,43.27,41.56,null],  cli:[3305,3050,3307,null]},
-  {nome:'G&V Barra do Piraí',  b:'Edificação', c:'Barra do Piraí',uf:'RJ', fat:[71185,66636,85467,null],      cmv:[.6064,.5935,.6428,null],   tkt:[27.05,26.52,29.34,null],  cli:[2632,2572,2913,null]},
-  {nome:'NR Medicamentos',     b:'Edificação', c:'Ji-Paraná',     uf:'RO', fat:[224333,174854,169127,175842], cmv:[.6107,.526,.5782,.5903],   tkt:[62.91,56.16,56.00,58.63], cli:[3566,3080,3051,2999]},
-  {nome:'Opcao Farma',         b:'Edificação', c:'Itu',           uf:'SP', fat:[98973,89344,98526,null],      cmv:[.5323,.5223,.535,null],    tkt:[36.12,34.47,36.50,null],  cli:[2740,2592,2830,null]},
-  {nome:'Baleroni Farma',      b:'Edificação', c:'Indaiatuba',    uf:'SP', fat:[78728,72494,90074,null],      cmv:[.5612,.5809,.5569,null],   tkt:[39.66,38.85,40.36,null],  cli:[1985,1866,2231,null]},
-  {nome:'Walma Barros',        b:'Edificação', c:'Patos',         uf:'PB', fat:[89396,85020,105584,96160],    cmv:[.6641,.6665,.6749,.6456],  tkt:[50.68,49.30,54.04,52.37], cli:[1761,1535,1936,1830]},
-  {nome:'Kock & Borges',       b:'Edificação', c:'S. J. Pinhais', uf:'PR', fat:[675422,639980,756302,704276], cmv:[.6321,.6269,.6267,.6223],  tkt:[62.54,63.01,64.36,64.10], cli:[10800,10157,11752,10988]},
-  {nome:'Dantas Varejista',    b:'Edificação', c:'S.V. Seridó',   uf:'PB', fat:[null,74195,76235,84886],      cmv:[null,.71,.731,.6224],      tkt:[null,25.80,31.29,28.33],  cli:[null,3541,2554,2996]},
-  {nome:'Kampa & Berger',      b:'Edificação', c:'Curitiba',      uf:'PR', fat:[null,null,362319,355824],     cmv:[null,null,.6708,.6553],    tkt:[null,null,70.92,70.56],   cli:[null,null,5109,5043]},
-  {nome:'DBS Drogaria',        b:'Edificação', c:'Cuiabá',        uf:'MT', fat:[null,null,null,154876],       cmv:[null,null,null,.5154],     tkt:[null,null,null,65.31],    cli:[null,null,null,2458]},
-  {nome:'Nova Brasília',       b:'Dolado',     c:'Ji-Paraná',     uf:'RO', fat:[650661,600289,671846,null],   cmv:[.667,.6759,.4852,null],    tkt:[47.82,47.82,48.52,null],  cli:[13606,12547,13846,null]},
-  {nome:'Drogaria Valdibia',   b:'Dolado',     c:'S.B. do Campo', uf:'SP', fat:[71885,60731,67882,76731],     cmv:[.6047,.605,.6079,.6],      tkt:[53.50,48.28,52.07,59.48], cli:[1346,1258,1304,1292]},
-];
+  let gesLojas = [];
 let gesFilter_cur='Todas', gesSearch_cur='', gesOpenRow=null;
-
 function buildLojasFromData(rawData) {
   if (!rawData || rawData.length === 0) return gesLojas;
   const allPeriods = [...new Set(rawData.map(r=>r.periodo).filter(Boolean))].sort();
