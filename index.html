@@ -760,7 +760,7 @@ async function saveToCloud(retries=2){
   if(!syncUrl)return false;
   setSyncStatus('syncing');lastSyncOpAt=Date.now();
   for(let attempt=0;attempt<=retries;attempt++){
-    tryconst payload={token:syncToken||URL_TOKEN,data:state};const res=await fetch(syncUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);lastSyncAt=new Date();pendingCloudSave=false;setSyncStatus('online');return true;}
+    try{const payload={token:syncToken||URL_TOKEN,data:state};const res=await fetch(syncUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);lastSyncAt=new Date();pendingCloudSave=false;setSyncStatus('online');return true;}
     catch(e){console.error(`Save attempt ${attempt+1} failed:`,e);if(attempt<retries)await new Promise(r=>setTimeout(r,1000*(attempt+1)));}
   }
   setSyncStatus('offline');toast('Erro ao salvar — alteração só local.','danger');return false;
