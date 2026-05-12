@@ -563,7 +563,7 @@ function applyUserAccess(role) {
 // ===== STATE =====
 // chave localStorage isolada de produção
 const STORAGE_KEY    = 'eden_command_staging_v1';
-const SYNC_URL_KEY   = 'eden_staging_sync_url';
+const SYNC_URL_KEY     = 'eden_staging_sync_url_fin'; const SYNC_URL_GES_KEY = 'eden_staging_sync_url_ges';
 const SYNC_TOKEN_FIN_KEY = 'eden_staging_sync_token_fin'; const SYNC_TOKEN_GES_KEY  = 'eden_staging_sync_token_ges';
 const UNITS = ['Plenitude', 'Edificação'];
 
@@ -571,7 +571,7 @@ let state = { inadimplencia:[], caixa:[], aprovacoes:[], historico:[] };
 let currentView = 'overview';
 let currentSpace = localStorage.getItem('eden_space_staging') || 'financeiro';
 let editingId = null, editingType = null;
-let syncUrl   = localStorage.getItem(SYNC_URL_KEY)   || '';
+let syncUrl    = localStorage.getItem(SYNC_URL_KEY)    || ''; let syncUrlGes = localStorage.getItem(SYNC_URL_GES_KEY) || '';
 let syncTokenFin = localStorage.getItem(SYNC_TOKEN_FIN_KEY) || ''; let syncTokenGes  = localStorage.getItem(SYNC_TOKEN_GES_KEY)  || '';
 let syncStatus = 'idle', syncTimer = null, lastSyncAt = null;
 let pendingCloudSave = false, lastSyncOpAt = 0;
@@ -1003,8 +1003,8 @@ function connectGesSync() {
   const url = document.getElementById('ges-sync-url-input').value.trim();
   const token = document.getElementById('ges-sync-token-input').value.trim();
   if (!url) { toast('Informe a URL', 'warning'); return; }
-  syncUrl = url; syncTokenGes = token;
-  localStorage.setItem(SYNC_URL_KEY, url);
+ syncUrl = url; syncTokenGes = token;
+  localStorage.setItem(SYNC_URL_GES_KEY, url);
   localStorage.setItem(SYNC_TOKEN_GES_KEY, token);
   const statusEl = document.getElementById('ges-sync-status-text');
   if (statusEl) statusEl.textContent = 'conectado';
@@ -1030,7 +1030,8 @@ async function testGesSync() {
 
 function disconnectGesSync() {
   if (!confirm('Desconectar da planilha?')) return;
-  syncTokenGes = '';
+  syncUrlGes = ''; syncTokenGes = '';
+  localStorage.removeItem(SYNC_URL_GES_KEY);
   localStorage.removeItem(SYNC_TOKEN_GES_KEY);
   const urlEl = document.getElementById('ges-sync-url-input');
   const tokenEl = document.getElementById('ges-sync-token-input');
