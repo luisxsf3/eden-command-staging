@@ -524,7 +524,6 @@ Kock &amp; Borges,Edificação,S. J. Pinhais,PR,2026-05,720000,0.63,64.50,11000<
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ===== TOKEN AUTH — STAGING =====
-// Tokens staging: EDEN-COO-STAGING (Luis) | EDEN-GES-STAGING (Vini)
 const URL_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
 let currentRole = 'luis';
 
@@ -546,7 +545,6 @@ function applyUserAccess(role) {
   if (linksCard && role === 'luis') {
     linksCard.style.display = 'block';
     const base = window.location.origin + window.location.pathname;
-    // ← STAGING tokens nos links gerados
     document.getElementById('link-luis').textContent = base + '?token=EDEN-COO-STAGING';
     document.getElementById('link-vini').textContent = base + '?token=EDEN-GES-STAGING';
   }
@@ -561,25 +559,37 @@ function applyUserAccess(role) {
 }
 
 // ===== STATE =====
-// chave localStorage isolada de produção
-const STORAGE_KEY    = 'eden_command_staging_v1';
-const SYNC_URL_KEY     = 'eden_staging_sync_url_fin'; const SYNC_URL_GES_KEY = 'eden_staging_sync_url_ges';
-const SYNC_TOKEN_FIN_KEY = 'eden_staging_sync_token_fin'; const SYNC_TOKEN_GES_KEY  = 'eden_staging_sync_token_ges';
+const STORAGE_KEY = 'eden_command_staging_v1';
+
+// Chaves separadas por espaço (Fin = Luis, Ges = Vini)
+const SYNC_URL_FIN_KEY   = 'eden_staging_sync_url_fin';
+const SYNC_URL_GES_KEY   = 'eden_staging_sync_url_ges';
+const SYNC_TOKEN_FIN_KEY = 'eden_staging_sync_token_fin';
+const SYNC_TOKEN_GES_KEY = 'eden_staging_sync_token_ges';
+
 const UNITS = ['Plenitude', 'Edificação'];
 
 let state = { inadimplencia:[], caixa:[], aprovacoes:[], historico:[] };
 let currentView = 'overview';
 let currentSpace = localStorage.getItem('eden_space_staging') || 'financeiro';
 let editingId = null, editingType = null;
-let syncUrl    = localStorage.getItem(SYNC_URL_KEY)    || ''; let syncUrlGes = localStorage.getItem(SYNC_URL_GES_KEY) || '';
-let syncTokenFin = localStorage.getItem(SYNC_TOKEN_FIN_KEY) || ''; let syncTokenGes  = localStorage.getItem(SYNC_TOKEN_GES_KEY)  || '';
+
+let syncUrlFin   = localStorage.getItem(SYNC_URL_FIN_KEY)   || '';
+let syncUrlGes   = localStorage.getItem(SYNC_URL_GES_KEY)   || '';
+let syncTokenFin = localStorage.getItem(SYNC_TOKEN_FIN_KEY) || '';
+let syncTokenGes = localStorage.getItem(SYNC_TOKEN_GES_KEY) || '';
+
 let syncStatus = 'idle', syncTimer = null, lastSyncAt = null;
 let pendingCloudSave = false, lastSyncOpAt = 0;
+
+// Helpers que retornam URL/token do espaço ATIVO
+function activeUrl()   { return currentSpace === 'gestao' ? syncUrlGes   : syncUrlFin; }
+function activeToken() { return currentSpace === 'gestao' ? syncTokenGes : syncTokenFin; }
 
 // ===== GESTÃO DATA =====
 let gesCurrentMeses = ['Jan','Fev','Mar','Abr'];
 let gesLojasRaw = [];
-  let gesLojas = [];
+let gesLojas = [];
 let gesFilter_cur='Todas', gesSearch_cur='', gesOpenRow=null;
 function buildLojasFromData(rawData) {
   if (!rawData || rawData.length === 0) return gesLojas;
@@ -637,7 +647,7 @@ function renderGesOverview(){
   new Chart(document.getElementById('chart-ges-cmv'),{type:'line',data:{labels:gesCurrentMeses,datasets:bandeiras.map(b=>({label:b,data:cmvBandMes[b],borderColor:bColors[b],backgroundColor:bColors[b]+'22',fill:true,tension:.35,borderWidth:2,pointRadius:3,spanGaps:true}))},options:gesChartOpts(v=>v+'%',false)});
   const comDados=gesLojas.filter(l=>l.fat.filter(x=>x!==null).length>=2);
   const topFat=[...comDados].sort((a,b)=>(gesAvg(b.fat)||0)-(gesAvg(a.fat)||0)).slice(0,5);
-  const maxFat=gesAvg(topFat[0].fat)||1;
+  const maxFat=gesAvg(topFat[0]?.fat)||1;
   document.getElementById('ges-top-list').innerHTML=topFat.map(l=>{const af=gesAvg(l.fat);const pct=Math.max(4,(af/maxFat)*100);return `<div class="rank-row"><div class="rank-name">${l.nome}</div><div class="rank-bar-track"><div class="rank-bar-fill" style="width:${pct}%;background:var(--eden-accent)"></div></div><div class="rank-val">${gesFmtK(af)}</div></div>`;}).join('');
   const topCmv=[...comDados].filter(l=>l.cmv.some(x=>x!==null)).sort((a,b)=>(gesAvg(b.cmv)||0)-(gesAvg(a.cmv)||0)).slice(0,5);
   document.getElementById('ges-cmv-list').innerHTML=topCmv.map(l=>{const ac=gesAvg(l.cmv);const pct=Math.max(4,(ac/.80)*100);const col=gesCmvColor(ac);return `<div class="rank-row"><div class="rank-name">${l.nome}</div><div class="rank-bar-track"><div class="rank-bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="rank-val" style="color:${col};font-weight:600">${gesFmtPct(ac)}</div></div>`;}).join('');
@@ -690,7 +700,7 @@ function buildGesDetail(l){
 }
 
 // ===== SAMPLE DATA =====
-const SAMPLE={inadimplencia:[{id:'b001',cliente:'Construtora Vértice Ltda',unidade:'Edificação',vencimento:'2026-04-10',valor:18500,status:'vencido'},{id:'b002',cliente:'Maria Aparecida Souza',unidade:'Plenitude',vencimento:'2026-04-15',valor:1450,status:'vencido'},{id:'b003',cliente:'Tech Solutions S.A.',unidade:'Plenitude',vencimento:'2026-04-22',valor:7200,status:'vencido'},{id:'b004',cliente:'João Roberto Lima',unidade:'Plenitude',vencimento:'2026-04-25',valor:980,status:'vencido'},{id:'b005',cliente:'Incorporadora Aurora',unidade:'Edificação',vencimento:'2026-04-05',valor:32000,status:'vencido'}],caixa:[{id:'c001',descricao:'Mensalidades Plenitude (lote 1)',categoria:'Receita recorrente',unidade:'Plenitude',data:'2026-05-05',tipo:'entrada',valor:145000,status:'previsto'},{id:'c002',descricao:'Folha de pagamento',categoria:'Pessoal',unidade:'Plenitude',data:'2026-05-05',tipo:'saida',valor:89000,status:'previsto'}],aprovacoes:[{id:'a001',titulo:'Compra de equipamentos servidor',solicitante:'Luis Eduardo',categoria:'Compra',valor:28500,data:'2026-04-29',descricao:'Renovação de infraestrutura — 2 servidores Dell PowerEdge.',status:'pendente'},{id:'a002',titulo:'Contratação consultoria jurídica',solicitante:'Vinicius',categoria:'Serviço',valor:15000,data:'2026-04-28',descricao:'Suporte LGPD compliance e revisão contratual.',status:'pendente'}],historico:[{id:'h001',titulo:'Pagamento bonificação Q1',solicitante:'RH',decisao:'aprovado',data:'2026-04-22',valor:35000},{id:'h002',titulo:'Compra de software CRM',solicitante:'Comercial',decisao:'rejeitado',data:'2026-04-20',valor:12000}]};
+const SAMPLE={inadimplencia:[{id:'b001',cliente:'Construtora Vértice Ltda',unidade:'Edificação',vencimento:'2026-04-10',valor:18500,status:'vencido'},{id:'b002',cliente:'Maria Aparecida Souza',unidade:'Plenitude',vencimento:'2026-04-15',valor:1450,status:'vencido'},{id:'b003',cliente:'Tech Solutions S.A.',unidade:'Plenitude',vencimento:'2026-04-22',valor:7200,status:'vencido'},{id:'b004',cliente:'João Roberto Lima',unidade:'Plenitude',vencimento:'2026-04-25',valor:980,status:'vencido'},{id:'b005',cliente:'Incorporadora Aurora',unidade:'Edificação',vencimento:'2026-04-05',valor:32000,status:'vencido'}],caixa:[],aprovacoes:[{id:'a001',titulo:'Compra de equipamentos servidor',solicitante:'Luis Eduardo',categoria:'Compra',valor:28500,data:'2026-04-29',descricao:'Renovação de infraestrutura.',status:'pendente'},{id:'a002',titulo:'Contratação consultoria jurídica',solicitante:'Vinicius',categoria:'Serviço',valor:15000,data:'2026-04-28',descricao:'Suporte LGPD.',status:'pendente'}],historico:[{id:'h001',titulo:'Pagamento bonificação Q1',solicitante:'RH',decisao:'aprovado',data:'2026-04-22',valor:35000},{id:'h002',titulo:'Compra de software CRM',solicitante:'Comercial',decisao:'rejeitado',data:'2026-04-20',valor:12000}]};
 
 // ===== HELPERS =====
 const fmtBR=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
@@ -703,7 +713,8 @@ function calcMora(valor,diasAtraso){if(diasAtraso<=0)return{multa:0,juros:0,atua
 const uid=(p='x')=>p+Math.random().toString(36).substr(2,6);
 
 // ===== STORAGE =====
-function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));document.getElementById('last-saved').textContent='Editado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});if(syncUrl){pendingCloudSave=true;scheduleSync();}}catch(e){toast('Erro ao salvar localmente','danger');}}
+function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));document.getElementById('last-saved').textContent='Editado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});if(activeUrl()){pendingCloudSave=true;scheduleSync();}}catch(e){toast('Erro ao salvar localmente','danger');}}
+
 function loadLocal(){
   try{const rawGes=localStorage.getItem('eden_staging_ges_lojas');if(rawGes){const parsed=JSON.parse(rawGes);if(parsed&&parsed.length>0){gesLojasRaw=parsed;gesLojas=buildLojasFromData(gesLojasRaw);}}}catch(e){}
   try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const p=JSON.parse(raw);['inadimplencia','caixa','aprovacoes','historico'].forEach(k=>state[k]=p[k]||[]);return true;}}catch(e){}
@@ -711,11 +722,12 @@ function loadLocal(){
 }
 
 async function load(){
-  if(!syncUrl){if(!loadLocal()){state=JSON.parse(JSON.stringify(SAMPLE));try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}}return'luis';}
+  // Para usuário Vini, usa URL/token do Gestão. Para Luis, do Financeiro inicialmente.
+  const url = currentRole === 'vini' ? syncUrlGes : syncUrlFin;
+  if(!url){if(!loadLocal()){state=JSON.parse(JSON.stringify(SAMPLE));try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}}return'luis';}
   setSyncStatus('syncing');
   try{
-    const url=syncUrl+'?token='+encodeURIComponent(URL_TOKEN);
-    const res=await fetch(url,{method:'GET',redirect:'follow'});
+    const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN),{method:'GET',redirect:'follow'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(data.error==='unauthorized'){showAccessDenied();return null;}
@@ -745,32 +757,72 @@ function setSyncStatus(status){
   const mobDot=document.getElementById('topbar-sync-dot'),mobTxt=document.getElementById('topbar-sync-text'),mobWrap=document.getElementById('topbar-sync-mobile');
   if(mobDot){mobDot.style.background=m.color;mobDot.style.boxShadow='0 0 6px '+m.color;}
   if(mobTxt)mobTxt.textContent=m.mob;if(mobWrap)mobWrap.style.color=m.color;
-  if(syncUrl&&lastSyncAt){const t=document.getElementById('sync-last-text');if(t)t.textContent=lastSyncAt.toLocaleString('pt-BR');}
+  if(activeUrl()&&lastSyncAt){const t=document.getElementById('sync-last-text');if(t)t.textContent=lastSyncAt.toLocaleString('pt-BR');}
 }
 
 function normalizeItem(item){const out={...item};if(out.valor!==undefined&&out.valor!==null&&out.valor!==''){if(typeof out.valor==='string'){out.valor=parseFloat(out.valor.replace(/[R$\s.]/g,'').replace(',','.'))||0;}else{out.valor=parseFloat(out.valor)||0;}}else{out.valor=0;}if(out.transitoria!==undefined){const v=out.transitoria;if(typeof v==='boolean')out.transitoria=v;else if(typeof v==='string'){const s=v.trim().toLowerCase();out.transitoria=(s==='true'||s==='sim'||s==='1'||s==='verdadeiro');}else if(typeof v==='number')out.transitoria=v===1;else out.transitoria=false;}if(out.vinculo===''||out.vinculo===null)delete out.vinculo;if(typeof out.vinculo==='string')out.vinculo=out.vinculo.trim()||undefined;['id','cliente','unidade','status','descricao','categoria','solicitante','titulo','tipo','data','vencimento','decisao','data_pagamento'].forEach(f=>{if(typeof out[f]==='string')out[f]=out[f].trim();});if(out.data_pagamento===''||out.data_pagamento===null)delete out.data_pagamento;return out;}
 
 async function loadFromCloud(){
-  if(!syncUrl||pendingCloudSave)return false;
+  const url = syncUrlFin; // Fin é o único que carrega state global
+  if(!url||pendingCloudSave)return false;
   lastSyncOpAt=Date.now();
-  try{const url=syncUrl+'?token='+encodeURIComponent(URL_TOKEN);const res=await fetch(url,{method:'GET',redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);if(pendingCloudSave)return false;['inadimplencia','caixa','aprovacoes','historico'].forEach(k=>{if(Array.isArray(data[k]))state[k]=data[k].map(item=>normalizeItem(item));});lastSyncAt=new Date();return true;}catch(e){console.error('Load cloud error',e);return false;}
+  try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN),{method:'GET',redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);if(pendingCloudSave)return false;['inadimplencia','caixa','aprovacoes','historico'].forEach(k=>{if(Array.isArray(data[k]))state[k]=data[k].map(item=>normalizeItem(item));});lastSyncAt=new Date();return true;}catch(e){console.error('Load cloud error',e);return false;}
 }
 
 async function saveToCloud(retries=2){
-  if(!syncUrl)return false;
+  // Salva state do Financeiro — usa URL/token Fin
+  if(!syncUrlFin)return false;
   setSyncStatus('syncing');lastSyncOpAt=Date.now();
   for(let attempt=0;attempt<=retries;attempt++){
-    try{const payload={token:syncTokenFin||URL_TOKEN,data:state};const res=await fetch(syncUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);lastSyncAt=new Date();pendingCloudSave=false;setSyncStatus('online');return true;}
-    catch(e){console.error(`Save attempt ${attempt+1} failed:`,e);if(attempt<retries)await new Promise(r=>setTimeout(r,1000*(attempt+1)));}
+    try{
+      const payload={token:syncTokenFin||URL_TOKEN,data:state};
+      const res=await fetch(syncUrlFin,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      if(data.error)throw new Error(data.error);
+      lastSyncAt=new Date();pendingCloudSave=false;setSyncStatus('online');return true;
+    }catch(e){console.error(`Save attempt ${attempt+1} failed:`,e);if(attempt<retries)await new Promise(r=>setTimeout(r,1000*(attempt+1)));}
   }
   setSyncStatus('offline');toast('Erro ao salvar — alteração só local.','danger');return false;
 }
 
 function scheduleSync(){if(syncTimer)clearTimeout(syncTimer);syncTimer=setTimeout(()=>saveToCloud(),300);}
-async function syncNow(){if(!syncUrl){toast('Configure a planilha primeiro (aba Dados)','warning');setView('dados');return;}setSyncStatus('syncing');const loaded=await loadFromCloud();if(loaded){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');toast('Sincronizado','success');renderAll();return;}setSyncStatus('offline');toast('Falha na sincronização','danger');}
-async function connectSync(){const url=document.getElementById('sync-url-input').value.trim();const token=document.getElementById('sync-token-input').value.trim();if(!url){toast('Informe a URL','warning');return;}syncUrl=url;syncTokenFin=token;localStorage.setItem(SYNC_URL_KEY,url);localStorage.setItem(SYNC_TOKEN_FIN_KEY,token);toast('Conectado. Sincronizando…','success');await syncNow();}
-async function testSync(){const url=document.getElementById('sync-url-input').value.trim()||syncUrl;const token=document.getElementById('sync-token-input').value.trim()||syncTokenFin;if(!url){toast('Informe a URL primeiro','warning');return;}toast('Testando…','info');try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN||token),{method:'GET',redirect:'follow'});const data=await res.json();if(data.error){toast('Erro: '+data.error,'danger');}else{toast('Conexão OK — role: '+data.role,'success');}}catch(e){toast('Falha: '+e.message,'danger');}}
-function disconnectSync(){if(!confirm('Desconectar da planilha?'))return;syncUrl='';syncTokenFin='';localStorage.removeItem(SYNC_URL_KEY);localStorage.removeItem(SYNC_TOKEN_FIN_KEY);document.getElementById('sync-url-input').value='';document.getElementById('sync-token-input').value='';setSyncStatus('idle');toast('Desconectado','warning');}
+
+async function syncNow(){
+  if(!activeUrl()){toast('Configure a planilha primeiro (aba Dados)','warning');setView(currentSpace==='gestao'?'ges-dados':'dados');return;}
+  setSyncStatus('syncing');
+  const loaded=await loadFromCloud();
+  if(loaded){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');toast('Sincronizado','success');renderAll();return;}
+  setSyncStatus('offline');toast('Falha na sincronização','danger');
+}
+
+// ── Financeiro (Luis) ──
+async function connectSync(){
+  const url=document.getElementById('sync-url-input').value.trim();
+  const token=document.getElementById('sync-token-input').value.trim();
+  if(!url){toast('Informe a URL','warning');return;}
+  syncUrlFin=url; syncTokenFin=token;
+  localStorage.setItem(SYNC_URL_FIN_KEY,url);
+  localStorage.setItem(SYNC_TOKEN_FIN_KEY,token);
+  toast('Conectado. Sincronizando…','success');
+  await syncNow();
+}
+async function testSync(){
+  const url=document.getElementById('sync-url-input').value.trim()||syncUrlFin;
+  const token=document.getElementById('sync-token-input').value.trim()||syncTokenFin;
+  if(!url){toast('Informe a URL primeiro','warning');return;}
+  toast('Testando…','info');
+  try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN||token),{method:'GET',redirect:'follow'});const data=await res.json();if(data.error){toast('Erro: '+data.error,'danger');}else{toast('Conexão OK — role: '+data.role,'success');}}catch(e){toast('Falha: '+e.message,'danger');}
+}
+function disconnectSync(){
+  if(!confirm('Desconectar da planilha?'))return;
+  syncUrlFin=''; syncTokenFin='';
+  localStorage.removeItem(SYNC_URL_FIN_KEY);
+  localStorage.removeItem(SYNC_TOKEN_FIN_KEY);
+  document.getElementById('sync-url-input').value='';
+  document.getElementById('sync-token-input').value='';
+  setSyncStatus('idle');toast('Desconectado','warning');
+}
 
 // ===== TOAST =====
 function toast(msg,type='success'){const c=document.getElementById('toast-container');const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(100%)';},2500);setTimeout(()=>t.remove(),2800);}
@@ -890,21 +942,6 @@ function renderEvolucaoChart(){
 function getCategoryIcon(cat){const c=(cat||'').toLowerCase().trim();const icons={
   'compra':{bg:'rgba(88,148,196,.12)',color:'#5894C4',svg:'<path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>'},
   'serviço':{bg:'rgba(111,167,72,.12)',color:'#6FA748',svg:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/>'},
-  'financeiro':{bg:'rgba(212,160,74,.12)',color:'#D4A04A',svg:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>'},
-  'conta transitória':{bg:'rgba(29,158,117,.12)',color:'#1D9E75',svg:'<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>'},
-  'pessoal':{bg:'rgba(196,88,70,.12)',color:'#C45846',svg:'<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/>'},
-  'plano de saúde':{bg:'rgba(196,88,70,.12)',color:'#C45846',svg:'<path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>'},
-  'iof plano de saúde':{bg:'rgba(196,88,70,.12)',color:'#C45846',svg:'<path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>'},
-  'prestador de serviço':{bg:'rgba(111,167,72,.12)',color:'#6FA748',svg:'<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>'},
-  'salários e encargos':{bg:'rgba(196,88,70,.12)',color:'#C45846',svg:'<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/>'},
-  'agência mkt':{bg:'rgba(213,85,120,.12)',color:'#D55578',svg:'<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>'},
-  'smartped':{bg:'rgba(88,148,196,.12)',color:'#5894C4',svg:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'},
-  'serviços contábeis e fiscais':{bg:'rgba(111,167,72,.12)',color:'#6FA748',svg:'<path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>'},
-  'vale transporte':{bg:'rgba(88,148,196,.12)',color:'#5894C4',svg:'<rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/>'},
-  'tecnologia':{bg:'rgba(88,148,196,.12)',color:'#5894C4',svg:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>'},
-  'despesas financeiras':{bg:'rgba(212,160,74,.12)',color:'#D4A04A',svg:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'},
-  'pró-labore':{bg:'rgba(127,119,221,.12)',color:'#7F77DD',svg:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>'},
-  'rescisão':{bg:'rgba(196,88,70,.12)',color:'#C45846',svg:'<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M18 8l4-4M22 8l-4-4"/>'},
 };const fallback={bg:'rgba(138,150,138,.12)',color:'#8A968A',svg:'<circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>'};return icons[c]||fallback;}
 function calcAprovacoesTotal(items){return items.reduce((s,a)=>{if(a.transitoria&&a.valor<0)return s;if(a.vinculo)return s;return s+a.valor;},0);}
 function calcAprovacoesCount(items){return items.filter(a=>!(a.transitoria&&a.valor<0)&&!a.vinculo).length;}
@@ -927,10 +964,7 @@ function renderApprovalCard(a,allItems,orderNum){
 function renderAprovacoes(){
   const pendentes=state.aprovacoes.filter(a=>a.status==='pendente');
   const visiveis=pendentes.filter(a=>!(a.transitoria&&a.valor<0));
-  visiveis.sort((a,b)=>{
-    const gk=i=>i.transitoria&&i.valor>0?`A_${i.id}`:i.vinculo?`A_${i.vinculo}_Z`:`B_${i.id}`;
-    return gk(a).localeCompare(gk(b));
-  });
+  visiveis.sort((a,b)=>{const gk=i=>i.transitoria&&i.valor>0?`A_${i.id}`:i.vinculo?`A_${i.vinculo}_Z`:`B_${i.id}`;return gk(a).localeCompare(gk(b));});
   const list=document.getElementById('aprovacoes-list');
   list.innerHTML=visiveis.length===0?'<div class="empty-state"><h4>Nenhum pagamento pendente</h4><p>Mesa limpa.</p></div>':visiveis.map((a,i)=>renderApprovalCard(a,pendentes,i+1)).join('');
   const hist=state.historico.slice().reverse();
@@ -988,10 +1022,10 @@ function renderAll(){
 function renderGesDados() {
   const urlEl = document.getElementById('ges-sync-url-input');
   const tokenEl = document.getElementById('ges-sync-token-input');
-  if (urlEl) urlEl.value = syncUrl;
+  if (urlEl) urlEl.value = syncUrlGes;
   if (tokenEl) tokenEl.value = syncTokenGes;
   const statusEl = document.getElementById('ges-sync-status-text');
-  if (statusEl) statusEl.textContent = syncUrl ? 'conectado' : 'desconectado';
+  if (statusEl) statusEl.textContent = syncUrlGes ? 'conectado' : 'desconectado';
   const status = document.getElementById('ges-dados-status');
   if (status && gesLojasRaw.length > 0) {
     const periods = [...new Set(gesLojasRaw.map(r=>r.periodo).filter(Boolean))].sort();
@@ -999,11 +1033,12 @@ function renderGesDados() {
   }
 }
 
+// ── Gestão (Vini) ──
 function connectGesSync() {
   const url = document.getElementById('ges-sync-url-input').value.trim();
   const token = document.getElementById('ges-sync-token-input').value.trim();
   if (!url) { toast('Informe a URL', 'warning'); return; }
- syncUrl = url; syncTokenGes = token;
+  syncUrlGes = url; syncTokenGes = token;
   localStorage.setItem(SYNC_URL_GES_KEY, url);
   localStorage.setItem(SYNC_TOKEN_GES_KEY, token);
   const statusEl = document.getElementById('ges-sync-status-text');
@@ -1012,8 +1047,8 @@ function connectGesSync() {
 }
 
 async function testGesSync() {
-  const url = document.getElementById('ges-sync-url-input').value.trim() || syncUrl;
-  const token = document.getElementById('ges-sync-token-input').value.trim() || syncToken;
+  const url = document.getElementById('ges-sync-url-input').value.trim() || syncUrlGes;
+  const token = document.getElementById('ges-sync-token-input').value.trim() || syncTokenGes;
   if (!url) { toast('Informe a URL primeiro', 'warning'); return; }
   toast('Testando…', 'info');
   try {
@@ -1095,13 +1130,13 @@ function mergeGesData(newRows) {
 }
 
 async function saveGestaoToCloud(lojas) {
-  if (!syncUrl) {
+  if (!syncUrlGes) {
     toast('Planilha não configurada — dados salvos só localmente', 'warning');
     return;
   }
   try {
     const payload = { token: syncTokenGes || URL_TOKEN, data: { gestao_lojas: lojas } };
-    const res = await fetch(syncUrl, {
+    const res = await fetch(syncUrlGes, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload),
@@ -1127,9 +1162,9 @@ function downloadGesTemplate() {
 
 // ===== INIT =====
 async function init(){
-  document.getElementById('sync-url-input').value=syncUrl;
+  document.getElementById('sync-url-input').value=syncUrlFin;
   document.getElementById('sync-token-input').value=syncTokenFin;
-  setSyncStatus(syncUrl?'syncing':'online');
+  setSyncStatus(syncUrlFin?'syncing':'online');
 
   const role=await load();
   if(role===null)return;
@@ -1141,7 +1176,7 @@ async function init(){
   renderAll();
 
   setInterval(async()=>{
-    if(!syncUrl||syncStatus==='syncing'||pendingCloudSave)return;
+    if(!syncUrlFin||syncStatus==='syncing'||pendingCloudSave)return;
     if(Date.now()-lastSyncOpAt<5000)return;
     const ok=await loadFromCloud();
     if(ok){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');renderAll();}
