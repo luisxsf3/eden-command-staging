@@ -769,8 +769,8 @@ async function saveToCloud(retries=2){
 function scheduleSync(){if(syncTimer)clearTimeout(syncTimer);syncTimer=setTimeout(()=>saveToCloud(),300);}
 async function syncNow(){if(!syncUrl){toast('Configure a planilha primeiro (aba Dados)','warning');setView('dados');return;}setSyncStatus('syncing');const loaded=await loadFromCloud();if(loaded){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');toast('Sincronizado','success');renderAll();return;}setSyncStatus('offline');toast('Falha na sincronização','danger');}
 async function connectSync(){const url=document.getElementById('sync-url-input').value.trim();const token=document.getElementById('sync-token-input').value.trim();if(!url){toast('Informe a URL','warning');return;}syncUrl=url;syncTokenFin=token;localStorage.setItem(SYNC_URL_KEY,url);localStorage.setItem(SYNC_TOKEN_FIN_KEY,token);toast('Conectado. Sincronizando…','success');await syncNow();}
-async function testSync(){const url=document.getElementById('sync-url-input').value.trim()||syncUrl;const token=document.getElementById('sync-token-input').value.trim()||syncToken;if(!url){toast('Informe a URL primeiro','warning');return;}toast('Testando…','info');try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN||token),{method:'GET',redirect:'follow'});const data=await res.json();if(data.error){toast('Erro: '+data.error,'danger');}else{toast('Conexão OK — role: '+data.role,'success');}}catch(e){toast('Falha: '+e.message,'danger');}}
-function disconnectSync(){if(!confirm('Desconectar da planilha?'))return;syncUrl='';syncToken='';localStorage.removeItem(SYNC_URL_KEY);localStorage.removeItem(SYNC_TOKEN_KEY);document.getElementById('sync-url-input').value='';document.getElementById('sync-token-input').value='';setSyncStatus('idle');toast('Desconectado','warning');}
+async function testSync(){const url=document.getElementById('sync-url-input').value.trim()||syncUrl;const token=document.getElementById('sync-token-input').value.trim()||syncTokenFin;if(!url){toast('Informe a URL primeiro','warning');return;}toast('Testando…','info');try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN||token),{method:'GET',redirect:'follow'});const data=await res.json();if(data.error){toast('Erro: '+data.error,'danger');}else{toast('Conexão OK — role: '+data.role,'success');}}catch(e){toast('Falha: '+e.message,'danger');}}
+function disconnectSync(){if(!confirm('Desconectar da planilha?'))return;syncUrl='';syncTokenFin='';localStorage.removeItem(SYNC_URL_KEY);localStorage.removeItem(SYNC_TOKEN_FIN_KEY);document.getElementById('sync-url-input').value='';document.getElementById('sync-token-input').value='';setSyncStatus('idle');toast('Desconectado','warning');}
 
 // ===== TOAST =====
 function toast(msg,type='success'){const c=document.getElementById('toast-container');const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(100%)';},2500);setTimeout(()=>t.remove(),2800);}
@@ -989,7 +989,7 @@ function renderGesDados() {
   const urlEl = document.getElementById('ges-sync-url-input');
   const tokenEl = document.getElementById('ges-sync-token-input');
   if (urlEl) urlEl.value = syncUrl;
-  if (tokenEl) tokenEl.value = syncToken;
+  if (tokenEl) tokenEl.value = syncTokenGes;
   const statusEl = document.getElementById('ges-sync-status-text');
   if (statusEl) statusEl.textContent = syncUrl ? 'conectado' : 'desconectado';
   const status = document.getElementById('ges-dados-status');
@@ -1127,7 +1127,7 @@ function downloadGesTemplate() {
 // ===== INIT =====
 async function init(){
   document.getElementById('sync-url-input').value=syncUrl;
-  document.getElementById('sync-token-input').value=syncToken;
+  document.getElementById('sync-token-input').value=syncTokenFin;
   setSyncStatus(syncUrl?'syncing':'online');
 
   const role=await load();
