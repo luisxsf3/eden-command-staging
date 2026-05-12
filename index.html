@@ -564,7 +564,7 @@ function applyUserAccess(role) {
 // chave localStorage isolada de produção
 const STORAGE_KEY    = 'eden_command_staging_v1';
 const SYNC_URL_KEY   = 'eden_staging_sync_url';
-const SYNC_TOKEN_KEY = 'eden_staging_sync_token';
+const SYNC_TOKEN_FIN_KEY = 'eden_staging_sync_token_fin'; const SYNC_TOKEN_GES_KEY  = 'eden_staging_sync_token_ges';
 const UNITS = ['Plenitude', 'Edificação'];
 
 let state = { inadimplencia:[], caixa:[], aprovacoes:[], historico:[] };
@@ -572,7 +572,7 @@ let currentView = 'overview';
 let currentSpace = localStorage.getItem('eden_space_staging') || 'financeiro';
 let editingId = null, editingType = null;
 let syncUrl   = localStorage.getItem(SYNC_URL_KEY)   || '';
-let syncToken = localStorage.getItem(SYNC_TOKEN_KEY) || '';
+let syncTokenFin = localStorage.getItem(SYNC_TOKEN_FIN_KEY) || ''; let syncTokenGes  = localStorage.getItem(SYNC_TOKEN_GES_KEY)  || '';
 let syncStatus = 'idle', syncTimer = null, lastSyncAt = null;
 let pendingCloudSave = false, lastSyncOpAt = 0;
 
@@ -760,7 +760,7 @@ async function saveToCloud(retries=2){
   if(!syncUrl)return false;
   setSyncStatus('syncing');lastSyncOpAt=Date.now();
   for(let attempt=0;attempt<=retries;attempt++){
-    try{const payload={token:syncToken||URL_TOKEN,data:state};const res=await fetch(syncUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);lastSyncAt=new Date();pendingCloudSave=false;setSyncStatus('online');return true;}
+    try{const payload={token:syncTokenFin||URL_TOKEN,data:state};const res=await fetch(syncUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);lastSyncAt=new Date();pendingCloudSave=false;setSyncStatus('online');return true;}
     catch(e){console.error(`Save attempt ${attempt+1} failed:`,e);if(attempt<retries)await new Promise(r=>setTimeout(r,1000*(attempt+1)));}
   }
   setSyncStatus('offline');toast('Erro ao salvar — alteração só local.','danger');return false;
@@ -768,7 +768,7 @@ async function saveToCloud(retries=2){
 
 function scheduleSync(){if(syncTimer)clearTimeout(syncTimer);syncTimer=setTimeout(()=>saveToCloud(),300);}
 async function syncNow(){if(!syncUrl){toast('Configure a planilha primeiro (aba Dados)','warning');setView('dados');return;}setSyncStatus('syncing');const loaded=await loadFromCloud();if(loaded){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');toast('Sincronizado','success');renderAll();return;}setSyncStatus('offline');toast('Falha na sincronização','danger');}
-async function connectSync(){const url=document.getElementById('sync-url-input').value.trim();const token=document.getElementById('sync-token-input').value.trim();if(!url){toast('Informe a URL','warning');return;}syncUrl=url;syncToken=token;localStorage.setItem(SYNC_URL_KEY,url);localStorage.setItem(SYNC_TOKEN_KEY,token);toast('Conectado. Sincronizando…','success');await syncNow();}
+async function connectSync(){const url=document.getElementById('sync-url-input').value.trim();const token=document.getElementById('sync-token-input').value.trim();if(!url){toast('Informe a URL','warning');return;}syncUrl=url;syncTokenFin=token;localStorage.setItem(SYNC_URL_KEY,url);localStorage.setItem(SYNC_TOKEN_FIN_KEY,token);toast('Conectado. Sincronizando…','success');await syncNow();}
 async function testSync(){const url=document.getElementById('sync-url-input').value.trim()||syncUrl;const token=document.getElementById('sync-token-input').value.trim()||syncToken;if(!url){toast('Informe a URL primeiro','warning');return;}toast('Testando…','info');try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN||token),{method:'GET',redirect:'follow'});const data=await res.json();if(data.error){toast('Erro: '+data.error,'danger');}else{toast('Conexão OK — role: '+data.role,'success');}}catch(e){toast('Falha: '+e.message,'danger');}}
 function disconnectSync(){if(!confirm('Desconectar da planilha?'))return;syncUrl='';syncToken='';localStorage.removeItem(SYNC_URL_KEY);localStorage.removeItem(SYNC_TOKEN_KEY);document.getElementById('sync-url-input').value='';document.getElementById('sync-token-input').value='';setSyncStatus('idle');toast('Desconectado','warning');}
 
@@ -1003,9 +1003,9 @@ function connectGesSync() {
   const url = document.getElementById('ges-sync-url-input').value.trim();
   const token = document.getElementById('ges-sync-token-input').value.trim();
   if (!url) { toast('Informe a URL', 'warning'); return; }
-  syncUrl = url; syncToken = token;
+  syncUrl = url; syncTokenGes = token;
   localStorage.setItem(SYNC_URL_KEY, url);
-  localStorage.setItem(SYNC_TOKEN_KEY, token);
+  localStorage.setItem(SYNC_TOKEN_GES_KEY, token);
   const statusEl = document.getElementById('ges-sync-status-text');
   if (statusEl) statusEl.textContent = 'conectado';
   toast('Conectado ✓', 'success');
@@ -1030,9 +1030,8 @@ async function testGesSync() {
 
 function disconnectGesSync() {
   if (!confirm('Desconectar da planilha?')) return;
-  syncUrl = ''; syncToken = '';
-  localStorage.removeItem(SYNC_URL_KEY);
-  localStorage.removeItem(SYNC_TOKEN_KEY);
+  syncTokenGes = '';
+  localStorage.removeItem(SYNC_TOKEN_GES_KEY);
   const urlEl = document.getElementById('ges-sync-url-input');
   const tokenEl = document.getElementById('ges-sync-token-input');
   if (urlEl) urlEl.value = '';
@@ -1100,7 +1099,7 @@ async function saveGestaoToCloud(lojas) {
     return;
   }
   try {
-    const payload = { token: syncToken || URL_TOKEN, data: { gestao_lojas: lojas } };
+    const payload = { token: syncTokenGes || URL_TOKEN, data: { gestao_lojas: lojas } };
     const res = await fetch(syncUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
