@@ -559,11 +559,9 @@ function applyUserAccess(role) {
 }
 
 // ===== STATE =====
+// 1 planilha = 1 URL. Tokens separados por usuário.
 const STORAGE_KEY = 'eden_command_staging_v1';
-
-// Chaves separadas por espaço (Fin = Luis, Ges = Vini)
-const SYNC_URL_FIN_KEY   = 'eden_staging_sync_url_fin';
-const SYNC_URL_GES_KEY   = 'eden_staging_sync_url_ges';
+const SYNC_URL_KEY       = 'eden_staging_sync_url';
 const SYNC_TOKEN_FIN_KEY = 'eden_staging_sync_token_fin';
 const SYNC_TOKEN_GES_KEY = 'eden_staging_sync_token_ges';
 
@@ -574,17 +572,15 @@ let currentView = 'overview';
 let currentSpace = localStorage.getItem('eden_space_staging') || 'financeiro';
 let editingId = null, editingType = null;
 
-let syncUrlFin   = localStorage.getItem(SYNC_URL_FIN_KEY)   || '';
-let syncUrlGes   = localStorage.getItem(SYNC_URL_GES_KEY)   || '';
+let syncUrl      = localStorage.getItem(SYNC_URL_KEY)       || '';
 let syncTokenFin = localStorage.getItem(SYNC_TOKEN_FIN_KEY) || '';
 let syncTokenGes = localStorage.getItem(SYNC_TOKEN_GES_KEY) || '';
 
 let syncStatus = 'idle', syncTimer = null, lastSyncAt = null;
 let pendingCloudSave = false, lastSyncOpAt = 0;
 
-// Helpers que retornam URL/token do espaço ATIVO
-function activeUrl()   { return currentSpace === 'gestao' ? syncUrlGes   : syncUrlFin; }
-function activeToken() { return currentSpace === 'gestao' ? syncTokenGes : syncTokenFin; }
+// Token correto pelo role do usuário
+function userToken() { return currentRole === 'vini' ? syncTokenGes : syncTokenFin; }
 
 // ===== GESTÃO DATA =====
 let gesCurrentMeses = ['Jan','Fev','Mar','Abr'];
@@ -700,7 +696,7 @@ function buildGesDetail(l){
 }
 
 // ===== SAMPLE DATA =====
-const SAMPLE={inadimplencia:[{id:'b001',cliente:'Construtora Vértice Ltda',unidade:'Edificação',vencimento:'2026-04-10',valor:18500,status:'vencido'},{id:'b002',cliente:'Maria Aparecida Souza',unidade:'Plenitude',vencimento:'2026-04-15',valor:1450,status:'vencido'},{id:'b003',cliente:'Tech Solutions S.A.',unidade:'Plenitude',vencimento:'2026-04-22',valor:7200,status:'vencido'},{id:'b004',cliente:'João Roberto Lima',unidade:'Plenitude',vencimento:'2026-04-25',valor:980,status:'vencido'},{id:'b005',cliente:'Incorporadora Aurora',unidade:'Edificação',vencimento:'2026-04-05',valor:32000,status:'vencido'}],caixa:[],aprovacoes:[{id:'a001',titulo:'Compra de equipamentos servidor',solicitante:'Luis Eduardo',categoria:'Compra',valor:28500,data:'2026-04-29',descricao:'Renovação de infraestrutura.',status:'pendente'},{id:'a002',titulo:'Contratação consultoria jurídica',solicitante:'Vinicius',categoria:'Serviço',valor:15000,data:'2026-04-28',descricao:'Suporte LGPD.',status:'pendente'}],historico:[{id:'h001',titulo:'Pagamento bonificação Q1',solicitante:'RH',decisao:'aprovado',data:'2026-04-22',valor:35000},{id:'h002',titulo:'Compra de software CRM',solicitante:'Comercial',decisao:'rejeitado',data:'2026-04-20',valor:12000}]};
+const SAMPLE={inadimplencia:[{id:'b001',cliente:'Construtora Vértice Ltda',unidade:'Edificação',vencimento:'2026-04-10',valor:18500,status:'vencido'},{id:'b002',cliente:'Maria Aparecida Souza',unidade:'Plenitude',vencimento:'2026-04-15',valor:1450,status:'vencido'}],caixa:[],aprovacoes:[{id:'a001',titulo:'Compra de equipamentos',solicitante:'Luis Eduardo',categoria:'Compra',valor:28500,data:'2026-04-29',descricao:'Renovação.',status:'pendente'}],historico:[]};
 
 // ===== HELPERS =====
 const fmtBR=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
@@ -713,7 +709,7 @@ function calcMora(valor,diasAtraso){if(diasAtraso<=0)return{multa:0,juros:0,atua
 const uid=(p='x')=>p+Math.random().toString(36).substr(2,6);
 
 // ===== STORAGE =====
-function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));document.getElementById('last-saved').textContent='Editado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});if(activeUrl()){pendingCloudSave=true;scheduleSync();}}catch(e){toast('Erro ao salvar localmente','danger');}}
+function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));document.getElementById('last-saved').textContent='Editado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});if(syncUrl){pendingCloudSave=true;scheduleSync();}}catch(e){toast('Erro ao salvar localmente','danger');}}
 
 function loadLocal(){
   try{const rawGes=localStorage.getItem('eden_staging_ges_lojas');if(rawGes){const parsed=JSON.parse(rawGes);if(parsed&&parsed.length>0){gesLojasRaw=parsed;gesLojas=buildLojasFromData(gesLojasRaw);}}}catch(e){}
@@ -722,12 +718,10 @@ function loadLocal(){
 }
 
 async function load(){
-  // Para usuário Vini, usa URL/token do Gestão. Para Luis, do Financeiro inicialmente.
-  const url = currentRole === 'vini' ? syncUrlGes : syncUrlFin;
-  if(!url){if(!loadLocal()){state=JSON.parse(JSON.stringify(SAMPLE));try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}}return'luis';}
+  if(!syncUrl){if(!loadLocal()){state=JSON.parse(JSON.stringify(SAMPLE));try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}}return'luis';}
   setSyncStatus('syncing');
   try{
-    const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN),{method:'GET',redirect:'follow'});
+    const res=await fetch(syncUrl+'?token='+encodeURIComponent(URL_TOKEN),{method:'GET',redirect:'follow'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(data.error==='unauthorized'){showAccessDenied();return null;}
@@ -757,26 +751,34 @@ function setSyncStatus(status){
   const mobDot=document.getElementById('topbar-sync-dot'),mobTxt=document.getElementById('topbar-sync-text'),mobWrap=document.getElementById('topbar-sync-mobile');
   if(mobDot){mobDot.style.background=m.color;mobDot.style.boxShadow='0 0 6px '+m.color;}
   if(mobTxt)mobTxt.textContent=m.mob;if(mobWrap)mobWrap.style.color=m.color;
-  if(activeUrl()&&lastSyncAt){const t=document.getElementById('sync-last-text');if(t)t.textContent=lastSyncAt.toLocaleString('pt-BR');}
+  if(syncUrl&&lastSyncAt){const t=document.getElementById('sync-last-text');if(t)t.textContent=lastSyncAt.toLocaleString('pt-BR');}
 }
 
 function normalizeItem(item){const out={...item};if(out.valor!==undefined&&out.valor!==null&&out.valor!==''){if(typeof out.valor==='string'){out.valor=parseFloat(out.valor.replace(/[R$\s.]/g,'').replace(',','.'))||0;}else{out.valor=parseFloat(out.valor)||0;}}else{out.valor=0;}if(out.transitoria!==undefined){const v=out.transitoria;if(typeof v==='boolean')out.transitoria=v;else if(typeof v==='string'){const s=v.trim().toLowerCase();out.transitoria=(s==='true'||s==='sim'||s==='1'||s==='verdadeiro');}else if(typeof v==='number')out.transitoria=v===1;else out.transitoria=false;}if(out.vinculo===''||out.vinculo===null)delete out.vinculo;if(typeof out.vinculo==='string')out.vinculo=out.vinculo.trim()||undefined;['id','cliente','unidade','status','descricao','categoria','solicitante','titulo','tipo','data','vencimento','decisao','data_pagamento'].forEach(f=>{if(typeof out[f]==='string')out[f]=out[f].trim();});if(out.data_pagamento===''||out.data_pagamento===null)delete out.data_pagamento;return out;}
 
 async function loadFromCloud(){
-  const url = syncUrlFin; // Fin é o único que carrega state global
-  if(!url||pendingCloudSave)return false;
+  if(!syncUrl||pendingCloudSave)return false;
   lastSyncOpAt=Date.now();
-  try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN),{method:'GET',redirect:'follow'});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(data.error)throw new Error(data.error);if(pendingCloudSave)return false;['inadimplencia','caixa','aprovacoes','historico'].forEach(k=>{if(Array.isArray(data[k]))state[k]=data[k].map(item=>normalizeItem(item));});lastSyncAt=new Date();return true;}catch(e){console.error('Load cloud error',e);return false;}
+  try{
+    const res=await fetch(syncUrl+'?token='+encodeURIComponent(URL_TOKEN),{method:'GET',redirect:'follow'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    if(pendingCloudSave)return false;
+    ['inadimplencia','caixa','aprovacoes','historico'].forEach(k=>{if(Array.isArray(data[k]))state[k]=data[k].map(item=>normalizeItem(item));});
+    if(Array.isArray(data.gestao_lojas)){gesLojasRaw=data.gestao_lojas;gesLojas=buildLojasFromData(gesLojasRaw);}
+    lastSyncAt=new Date();
+    return true;
+  }catch(e){console.error('Load cloud error',e);return false;}
 }
 
 async function saveToCloud(retries=2){
-  // Salva state do Financeiro — usa URL/token Fin
-  if(!syncUrlFin)return false;
+  if(!syncUrl)return false;
   setSyncStatus('syncing');lastSyncOpAt=Date.now();
   for(let attempt=0;attempt<=retries;attempt++){
     try{
       const payload={token:syncTokenFin||URL_TOKEN,data:state};
-      const res=await fetch(syncUrlFin,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});
+      const res=await fetch(syncUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'});
       if(!res.ok)throw new Error('HTTP '+res.status);
       const data=await res.json();
       if(data.error)throw new Error(data.error);
@@ -789,39 +791,37 @@ async function saveToCloud(retries=2){
 function scheduleSync(){if(syncTimer)clearTimeout(syncTimer);syncTimer=setTimeout(()=>saveToCloud(),300);}
 
 async function syncNow(){
-  if(!activeUrl()){toast('Configure a planilha primeiro (aba Dados)','warning');setView(currentSpace==='gestao'?'ges-dados':'dados');return;}
+  if(!syncUrl){toast('Configure a planilha primeiro (aba Dados)','warning');setView(currentSpace==='gestao'?'ges-dados':'dados');return;}
   setSyncStatus('syncing');
   const loaded=await loadFromCloud();
   if(loaded){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');toast('Sincronizado','success');renderAll();return;}
   setSyncStatus('offline');toast('Falha na sincronização','danger');
 }
 
-// ── Financeiro (Luis) ──
+// ── Financeiro (Luis) — grava URL e token_fin ──
 async function connectSync(){
   const url=document.getElementById('sync-url-input').value.trim();
   const token=document.getElementById('sync-token-input').value.trim();
   if(!url){toast('Informe a URL','warning');return;}
-  syncUrlFin=url; syncTokenFin=token;
-  localStorage.setItem(SYNC_URL_FIN_KEY,url);
+  syncUrl=url; syncTokenFin=token;
+  localStorage.setItem(SYNC_URL_KEY,url);
   localStorage.setItem(SYNC_TOKEN_FIN_KEY,token);
   toast('Conectado. Sincronizando…','success');
   await syncNow();
 }
 async function testSync(){
-  const url=document.getElementById('sync-url-input').value.trim()||syncUrlFin;
+  const url=document.getElementById('sync-url-input').value.trim()||syncUrl;
   const token=document.getElementById('sync-token-input').value.trim()||syncTokenFin;
   if(!url){toast('Informe a URL primeiro','warning');return;}
   toast('Testando…','info');
   try{const res=await fetch(url+'?token='+encodeURIComponent(URL_TOKEN||token),{method:'GET',redirect:'follow'});const data=await res.json();if(data.error){toast('Erro: '+data.error,'danger');}else{toast('Conexão OK — role: '+data.role,'success');}}catch(e){toast('Falha: '+e.message,'danger');}
 }
 function disconnectSync(){
-  if(!confirm('Desconectar da planilha?'))return;
-  syncUrlFin=''; syncTokenFin='';
-  localStorage.removeItem(SYNC_URL_FIN_KEY);
+  if(!confirm('Desconectar token do Financeiro?'))return;
+  syncTokenFin='';
   localStorage.removeItem(SYNC_TOKEN_FIN_KEY);
-  document.getElementById('sync-url-input').value='';
   document.getElementById('sync-token-input').value='';
-  setSyncStatus('idle');toast('Desconectado','warning');
+  toast('Token Financeiro removido','warning');
 }
 
 // ===== TOAST =====
@@ -1022,10 +1022,10 @@ function renderAll(){
 function renderGesDados() {
   const urlEl = document.getElementById('ges-sync-url-input');
   const tokenEl = document.getElementById('ges-sync-token-input');
-  if (urlEl) urlEl.value = syncUrlGes;
+  if (urlEl) urlEl.value = syncUrl;
   if (tokenEl) tokenEl.value = syncTokenGes;
   const statusEl = document.getElementById('ges-sync-status-text');
-  if (statusEl) statusEl.textContent = syncUrlGes ? 'conectado' : 'desconectado';
+  if (statusEl) statusEl.textContent = (syncUrl && syncTokenGes) ? 'conectado' : 'desconectado';
   const status = document.getElementById('ges-dados-status');
   if (status && gesLojasRaw.length > 0) {
     const periods = [...new Set(gesLojasRaw.map(r=>r.periodo).filter(Boolean))].sort();
@@ -1033,13 +1033,13 @@ function renderGesDados() {
   }
 }
 
-// ── Gestão (Vini) ──
+// ── Gestão (Vini) — grava URL (compartilhada) e token_ges (próprio) ──
 function connectGesSync() {
   const url = document.getElementById('ges-sync-url-input').value.trim();
   const token = document.getElementById('ges-sync-token-input').value.trim();
   if (!url) { toast('Informe a URL', 'warning'); return; }
-  syncUrlGes = url; syncTokenGes = token;
-  localStorage.setItem(SYNC_URL_GES_KEY, url);
+  syncUrl = url; syncTokenGes = token;
+  localStorage.setItem(SYNC_URL_KEY, url);
   localStorage.setItem(SYNC_TOKEN_GES_KEY, token);
   const statusEl = document.getElementById('ges-sync-status-text');
   if (statusEl) statusEl.textContent = 'conectado';
@@ -1047,7 +1047,7 @@ function connectGesSync() {
 }
 
 async function testGesSync() {
-  const url = document.getElementById('ges-sync-url-input').value.trim() || syncUrlGes;
+  const url = document.getElementById('ges-sync-url-input').value.trim() || syncUrl;
   const token = document.getElementById('ges-sync-token-input').value.trim() || syncTokenGes;
   if (!url) { toast('Informe a URL primeiro', 'warning'); return; }
   toast('Testando…', 'info');
@@ -1064,17 +1064,14 @@ async function testGesSync() {
 }
 
 function disconnectGesSync() {
-  if (!confirm('Desconectar da planilha?')) return;
-  syncUrlGes = ''; syncTokenGes = '';
-  localStorage.removeItem(SYNC_URL_GES_KEY);
+  if (!confirm('Desconectar token do Gestão?')) return;
+  syncTokenGes = '';
   localStorage.removeItem(SYNC_TOKEN_GES_KEY);
-  const urlEl = document.getElementById('ges-sync-url-input');
   const tokenEl = document.getElementById('ges-sync-token-input');
-  if (urlEl) urlEl.value = '';
   if (tokenEl) tokenEl.value = '';
   const statusEl = document.getElementById('ges-sync-status-text');
   if (statusEl) statusEl.textContent = 'desconectado';
-  toast('Desconectado', 'warning');
+  toast('Token Gestão removido', 'warning');
 }
 
 function importGesData() {
@@ -1130,13 +1127,14 @@ function mergeGesData(newRows) {
 }
 
 async function saveGestaoToCloud(lojas) {
-  if (!syncUrlGes) {
+  if (!syncUrl) {
     toast('Planilha não configurada — dados salvos só localmente', 'warning');
     return;
   }
   try {
-    const payload = { token: syncTokenGes || URL_TOKEN, data: { gestao_lojas: lojas } };
-    const res = await fetch(syncUrlGes, {
+    // Usa o token do USUÁRIO ATIVO (Vini → token_ges, Luis → token_fin)
+    const payload = { token: userToken() || URL_TOKEN, data: { gestao_lojas: lojas } };
+    const res = await fetch(syncUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload),
@@ -1162,9 +1160,9 @@ function downloadGesTemplate() {
 
 // ===== INIT =====
 async function init(){
-  document.getElementById('sync-url-input').value=syncUrlFin;
+  document.getElementById('sync-url-input').value=syncUrl;
   document.getElementById('sync-token-input').value=syncTokenFin;
-  setSyncStatus(syncUrlFin?'syncing':'online');
+  setSyncStatus(syncUrl?'syncing':'online');
 
   const role=await load();
   if(role===null)return;
@@ -1176,7 +1174,7 @@ async function init(){
   renderAll();
 
   setInterval(async()=>{
-    if(!syncUrlFin||syncStatus==='syncing'||pendingCloudSave)return;
+    if(!syncUrl||syncStatus==='syncing'||pendingCloudSave)return;
     if(Date.now()-lastSyncOpAt<5000)return;
     const ok=await loadFromCloud();
     if(ok){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}setSyncStatus('online');renderAll();}
